@@ -1,4 +1,6 @@
-use anchor_lang::prelude::*;
+use std::io::Write;
+
+use anchor_lang::{ __private::CLOSED_ACCOUNT_DISCRIMINATOR, prelude::* };
 
 declare_id!("2NW2t7NuhrzpscaZomaEjYW2he5P9AwAnSNHbT3UEEHJ");
 
@@ -76,12 +78,34 @@ pub mod todo {
         }
 
         //item.to_account_info().close(item_creator.to_account_info())?;
+        close_account(
+            &mut item.to_account_info(), 
+            &mut item_creator.to_account_info(),
+        );
 
         let item_key = ctx.accounts.item.to_account_info().key;
         list.lines.retain(|key| key != item_key);
 
         Ok(())
     }
+}
+
+pub fn close_account(
+    pda_to_close: &mut AccountInfo,
+    sol_destination: &mut AccountInfo,
+) -> Result<()> {
+    let dest_starting_lamports = sol_destination.lamports();
+    **sol_destination.lamports.borrow_mut() = 
+        dest_starting_lamports.try_add(pda_to_close.lamports());
+    **pda_to_close.lamports.borrow_mut() = 0;
+
+    let mut data = pda_to_close.try_borrow_data()?;
+    let dst: &mut [u8] = &mut data;
+    let mut cursor = std::io::Cursor::new(dst);
+    cursor
+        .write_all(&CLOSED_ACCOUNT_DISCRIMINATOR)
+        .map_err(|_| error!(TodoListError::CloseFailed))?;
+    Ok(())
 }
 
 #[derive(Accounts)]
@@ -201,4 +225,6 @@ pub enum TodoListError {
     WrongListOwner,
     #[msg("Specified item creator does not match the pubkey in the item")]
     WrongItemCreator,
+    #[msg("Failed to close account descriminator")]
+    CloseFailed,
 }

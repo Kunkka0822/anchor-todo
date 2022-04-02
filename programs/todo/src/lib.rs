@@ -55,19 +55,30 @@ pub mod todo {
                 },
             );
             transfer(cpi_ctx, transfer_amount)?;
-            // invoke(
-            //     &transfer(
-            //         user.to_account_info().key,
-            //         item.to_account_info().key,
-            //         transfer_amount,
-            //     ),
-            //     &[
-            //         user.to_account_info(),
-            //         item.to_account_info(),
-            //         ctx.accounts.system_program.to_account_info(),
-            //     ],
-            // )?;
         }
+
+        Ok(())
+    }
+
+    pub fn cancel(ctx: Context<Cancel>, _list_name: String) -> Result<()> {
+        let list = &mut ctx.accounts.list;
+        let item = &mut ctx.accounts.item;
+        let item_creator = &ctx.accounts.item_creator;
+
+        let user = ctx.accounts.user.to_account_info().key;
+
+        if &list.list_owner != user && &item.creator != user {
+            return Err(error!(TodoListError::CancelPermissions));
+        }
+
+        if !list.lines.contains(item.to_account_info().key) {
+            return Err(error!(TodoListError::ItemNotFound));
+        }
+
+        item.close(item_creator.to_account_info());
+
+        let item_key = ctx.accounts.item.to_account_info().key;
+        list.lines.retain(|key| key != item_key);
 
         Ok(())
     }
@@ -110,6 +121,26 @@ pub struct Add<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
     pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(list_name: String)]
+pub struct Cancel<'info> {
+    #[account(mut,
+        has_one=list_owner @ TodoListError::WrongListOwner,
+        seeds=[
+            b"todolist",
+            list_owner.to_account_info().key().as_ref(),
+            name_seed(&list_name)
+        ], bump)]
+    pub list: Account<'info, TodoList>,
+    /// CHECK:
+    pub list_owner: AccountInfo<'info>,
+    #[account(mut)]
+    put item: Account<'info, ListItem>,
+    #[account(mut, address=item.creator @ TodoListError::WrongItemCreator)]
+    pub item_creator: AccountInfo<'info>,
+    pub user: Signer<'info>,
 }
 
 #[account]

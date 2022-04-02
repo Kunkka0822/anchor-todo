@@ -1,11 +1,13 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{ Transfer, transfer, Token };
+use anchor_spl::token::{ Token };
 
 declare_id!("2NW2t7NuhrzpscaZomaEjYW2he5P9AwAnSNHbT3UEEHJ");
 
 
 #[program]
 pub mod todo {
+    use anchor_lang::system_program::{Transfer, transfer};
+
     use super::*;
 
     pub fn new_list(
@@ -47,20 +49,13 @@ pub mod todo {
 
         if transfer_amount > 0 {
             let cpi_ctx = CpiContext::new(
-                ctx.accounts.token_program.to_account_info(),
+                ctx.accounts.system_program.to_account_info(),
                 Transfer {
                     from: user.to_account_info(),
-                    to: item.to_account_info(),
-                    authority: user.to_account_info(),
+                    to: item.to_account_info()
                 },
             );
-            let user_account_info = user.to_account_info().key();
-            let seeds = [
-                b"todolist",
-                user_account_info.as_ref(),
-                name_seed(&list.name)
-            ];
-            transfer(cpi_ctx.with_signer(&[&seeds[..]]), transfer_amount)?;
+            transfer(cpi_ctx, transfer_amount)?;
             // invoke(
             //     &transfer(
             //         user.to_account_info().key,

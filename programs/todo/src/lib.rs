@@ -47,14 +47,14 @@ pub mod todo {
 
         if transfer_amount > 0 {
             let cpi_ctx = CpiContext::new(
-                ctx.accounts.token_program.to_account_info().clone(),
+                ctx.accounts.system_program.to_account_info().clone(),
                 anchor_spl::token::Transfer {
-                    from: ctx.accounts.reward_mint_account.to_account_info().clone(),
-                    to: ctx.accounts.reward_account.to_account_info().clone(),
-                    authority: ctx.accounts.reward.to_account_info().clone(),
+                    from: user.to_account_info().clone(),
+                    to: item.to_account_info().clone(),
+                    authority: user.to_account_info().clone(),
                 },
             );
-            anchor_spl::token::transfer(cpi_ctx.with_signer(&[&seeds[..]]), reward_amount)?;
+            anchor_spl::token::transfer(cpi_ctx.with_signer(&[&ctx.accounts.seeds[..]]), transfer_amount)?;
             // invoke(
             //     &transfer(
             //         user.to_account_info().key,

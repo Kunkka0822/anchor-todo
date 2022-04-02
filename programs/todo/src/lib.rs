@@ -75,7 +75,7 @@ pub mod todo {
             return Err(error!(TodoListError::ItemNotFound));
         }
 
-        item.close(item_creator.to_account_info());
+        //item.to_account_info().close(item_creator.to_account_info())?;
 
         let item_key = ctx.accounts.item.to_account_info().key;
         list.lines.retain(|key| key != item_key);
@@ -137,7 +137,7 @@ pub struct Cancel<'info> {
     /// CHECK:
     pub list_owner: AccountInfo<'info>,
     #[account(mut)]
-    put item: Account<'info, ListItem>,
+    pub item: Account<'info, ListItem>,
     #[account(mut, address=item.creator @ TodoListError::WrongItemCreator)]
     pub item_creator: AccountInfo<'info>,
     pub user: Signer<'info>,

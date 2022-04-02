@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{ Token };
 
 declare_id!("2NW2t7NuhrzpscaZomaEjYW2he5P9AwAnSNHbT3UEEHJ");
 
@@ -111,7 +110,6 @@ pub struct Add<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
     pub system_program: Program<'info, System>,
-    pub token_program: Program<'info, Token>
 }
 
 #[account]

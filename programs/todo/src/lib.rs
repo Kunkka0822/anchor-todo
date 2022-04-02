@@ -3,6 +3,43 @@ use anchor_lang::prelude::*;
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 
 
+#[program]
+pub mod todo {
+    use super::*;
+
+    pub fn new_list(
+        ctx: Context<NewList>,
+        name: String,
+        capacity: u16,
+        account_bump: u8,
+    ) -> Result<()> {
+        let list = &mut ctx.accounts.list;
+        list.list_owner = *ctx.accounts.user.to_account_info().key;
+        list.bump = account_bump;
+        list.name = name;
+        list.capacity = capacity;
+        Ok(())
+    }
+}
+
+#[derive(Accounts)]
+#[instruction(name: String, capacity: u16, list_bump: u8)]
+pub struct NewList<'info> {
+    #[account(init, payer=user,
+        space=TodoList::space(&name, capacity),
+        seeds=[
+            b"todolist",
+            user.to_account_info().key().as_ref(),
+            name_seed(&name)
+        ],
+        bump)]
+    pub list: Account<'info, TodoList>,
+    #[account(mut)]
+    pub user: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+
 #[account]
 pub struct TodoList {
     pub list_owner: Pubkey,
@@ -27,37 +64,4 @@ impl TodoList {
 fn name_seed(name: &str) -> &[u8] {
     let b = name.as_bytes();
     if b.len() > 32 { &b[0..32] } else { b }
-}
-
-#[derive(Accounts)]
-#[instruction(name: String, capacity: u16, list_bump: u8)]
-pub struct NewList<'info> {
-    #[account(init, payer=user,
-        space=TodoList::space(&name, capacity),
-        seeds=[
-            b"todolist",
-            user.to_account_info().key_as_ref(),
-            name_seed(&name)
-        ],
-        bump=list_bump)]
-    pub list: Account<'info, TodoList>,
-    pub user: Signer<'info>,
-    pub system_program: Program<'info, System>,
-}
-
-
-#[program]
-pub mod todo {
-    pub fn new_list(
-        ctx: Context<NewList>,
-        name: String,
-        capacity: u16,
-        account_bump: u8,
-    ) -> ProgramResult {
-        let list = &mut ctx.accounts.list;
-        list.list_owner = *ctx.accounts.user.to_account_infos().key;
-        list.bump = account_bump;
-        list.name = name;
-        list.capacity = capacity;
-    }
 }

@@ -56,8 +56,8 @@ async function createList(owner: {
   provider: anchor.Provider
 }, name, capacity = 16) {
   const [listAccount, bump] = await PublicKey.findProgramAddress(
-    [Buffer.from('todolist'), owner.key.publicKey.toBuffer(), Buffer.from(name.slice(0, 32))],
-    mainProgram.programId // undefined. error from this.
+    ['todolist', owner.key.publicKey.toBuffer(), name.slice(0, 32)],
+    mainProgram.programId
   );
 
   // let program = programForUser(owner);

@@ -1,8 +1,7 @@
 import * as anchor from '@project-serum/anchor';
-import {
-  PublicKey
-} from '@solana/web3.js';
+import { PublicKey } from '@solana/web3.js';
 import { Todo } from "../target/types/todo";
+import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
 
 const BN = require('bn.js');
 const expect = require('chai').expect;
@@ -87,6 +86,7 @@ async function addItem({ list, user, name, bounty }) {
       item: itemAccount.publicKey,
       user: user.key.publicKey,
       systemProgram: SystemProgram.programId,
+      tokenProgram: TOKEN_PROGRAM_ID,
     },
     signers: [
       user.key,

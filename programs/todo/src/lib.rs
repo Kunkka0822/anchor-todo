@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_lang::system_program::transfer;
+use anchor_spl::token::{ Transfer, transfer, Token };
 
 declare_id!("2NW2t7NuhrzpscaZomaEjYW2he5P9AwAnSNHbT3UEEHJ");
 
@@ -33,7 +33,7 @@ pub mod todo {
         let item = &mut ctx.accounts.item;
 
         if list.lines.len() >= list.capacity as usize {
-            return Err(TodoListError::ListFull.into());
+            return Err(error!(TodoListError::ListFull));
         }
 
         list.lines.push(*item.to_account_info().key);
@@ -43,18 +43,24 @@ pub mod todo {
         let account_lamports = **item.to_account_info().lamports.borrow();
         let transfer_amount = bounty
             .checked_sub(account_lamports)
-            .ok_or(TodoListError::BountyTooSmall.into())?;
+            .ok_or(TodoListError::BountyTooSmall)?;
 
         if transfer_amount > 0 {
             let cpi_ctx = CpiContext::new(
-                ctx.accounts.system_program.to_account_info().clone(),
-                anchor_spl::token::Transfer {
-                    from: user.to_account_info().clone(),
-                    to: item.to_account_info().clone(),
-                    authority: user.to_account_info().clone(),
+                ctx.accounts.token_program.to_account_info(),
+                Transfer {
+                    from: user.to_account_info(),
+                    to: item.to_account_info(),
+                    authority: user.to_account_info(),
                 },
             );
-            anchor_spl::token::transfer(cpi_ctx.with_signer(&[&ctx.accounts.seeds[..]]), transfer_amount)?;
+            let user_account_info = user.to_account_info().key();
+            let seeds = [
+                b"todolist",
+                user_account_info.as_ref(),
+                name_seed(&list.name)
+            ];
+            transfer(cpi_ctx.with_signer(&[&seeds[..]]), transfer_amount)?;
             // invoke(
             //     &transfer(
             //         user.to_account_info().key,
@@ -102,6 +108,7 @@ pub struct Add<'info> {
             name_seed(&list_name)
         ], bump)]
     pub list: Account<'info, TodoList>,
+    /// CHECK:
     pub list_owner: AccountInfo<'info>,
 
     #[account(init, payer=user, space=ListItem::space(&item_name))]
@@ -109,6 +116,7 @@ pub struct Add<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
     pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, Token>
 }
 
 #[account]

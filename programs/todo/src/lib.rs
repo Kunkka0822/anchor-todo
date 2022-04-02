@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use anchor_lang::system_program::transfer;
 
 declare_id!("2NW2t7NuhrzpscaZomaEjYW2he5P9AwAnSNHbT3UEEHJ");
 
@@ -22,11 +23,11 @@ pub mod todo {
     }
 
     pub fn add(
-        ctx: Context<NewList>,
+        ctx: Context<Add>,
         _list_name: String,
         item_name: String,
         bounty: u64,
-    ) -> ProgramResult {
+    ) -> Result<()> {
         let user = &ctx.accounts.user;
         let list = &mut ctx.accounts.list;
         let item = &mut ctx.accounts.item;
@@ -37,26 +38,35 @@ pub mod todo {
 
         list.lines.push(*item.to_account_info().key);
         item.name = item_name;
-        item.creator = *user.to_account_infos().key;
+        item.creator = *user.to_account_info().key;
 
-        let account_lamports = **item.to_account_info.account_lamports.borrow();
+        let account_lamports = **item.to_account_info().lamports.borrow();
         let transfer_amount = bounty
             .checked_sub(account_lamports)
-            .ok_or(TodoListError::BountyTooSmall)?;
+            .ok_or(TodoListError::BountyTooSmall.into())?;
 
         if transfer_amount > 0 {
-            invoke(
-                &transfer(
-                    user.to_account_info().key,
-                    item.to_account_info().key,
-                    transfer_amount,
-                ),
-                &[
-                    user.to_account_info(),
-                    item.to_account_info(),
-                    ctx.accounts.system_program.to_account_info(),
-                ],
-            )?;
+            let cpi_ctx = CpiContext::new(
+                ctx.accounts.token_program.to_account_info().clone(),
+                anchor_spl::token::Transfer {
+                    from: ctx.accounts.reward_mint_account.to_account_info().clone(),
+                    to: ctx.accounts.reward_account.to_account_info().clone(),
+                    authority: ctx.accounts.reward.to_account_info().clone(),
+                },
+            );
+            anchor_spl::token::transfer(cpi_ctx.with_signer(&[&seeds[..]]), reward_amount)?;
+            // invoke(
+            //     &transfer(
+            //         user.to_account_info().key,
+            //         item.to_account_info().key,
+            //         transfer_amount,
+            //     ),
+            //     &[
+            //         user.to_account_info(),
+            //         item.to_account_info(),
+            //         ctx.accounts.system_program.to_account_info(),
+            //     ],
+            // )?;
         }
 
         Ok(())
@@ -88,7 +98,7 @@ pub struct Add<'info> {
         has_one=list_owner @ TodoListError::WrongListOwner,
         seeds=[
             b"todolist",
-            list_owner.to_account_info.key().as_ref(),
+            list_owner.to_account_info().key().as_ref(),
             name_seed(&list_name)
         ], bump)]
     pub list: Account<'info, TodoList>,
@@ -96,6 +106,7 @@ pub struct Add<'info> {
 
     #[account(init, payer=user, space=ListItem::space(&item_name))]
     pub item: Account<'info, ListItem>,
+    #[account(mut)]
     pub user: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
@@ -140,4 +151,22 @@ impl ListItem {
 fn name_seed(name: &str) -> &[u8] {
     let b = name.as_bytes();
     if b.len() > 32 { &b[0..32] } else { b }
+}
+
+#[error_code]
+pub enum TodoListError {
+    #[msg("This list is full")]
+    ListFull,
+    #[msg("Bounty must be enough to mark account rent-exempt")]
+    BountyTooSmall,
+    #[msg("Only the list owner or item creator may cancel an item")]
+    CancelPermissions,
+    #[msg("Only the list owner or item creator may finish an item")]
+    FinishPermissions,
+    #[msg("Item does not belong to this todo list")]
+    ItemNotFound,
+    #[msg("Specified list owner does not match the pubkey in the list")]
+    WrongListOwner,
+    #[msg("Specified item creator does not match the pubkey in the item")]
+    WrongItemCreator,
 }
